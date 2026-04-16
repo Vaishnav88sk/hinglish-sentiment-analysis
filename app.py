@@ -1,4 +1,5 @@
 import os
+import re
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import streamlit as st
@@ -24,25 +25,146 @@ emotion_model = load_emotion()
 def contains_hindi(text):
     return any("\u0900" <= c <= "\u097F" for c in text)
 
+_hinglish_idioms = {
+    # Roman Hinglish idioms → English
+    "wah kya baat hai": "wow that's amazing",
+    "kya baat hai": "that's amazing",
+    "wah kya baat": "wow that's amazing",
+    "maza aa gaya": "that was so enjoyable",
+    "dil khush ho gaya": "it made me so happy",
+    "kya mast hai": "this is so cool",
+    "bohot badiya": "that's really great",
+    "bahut badiya": "that's really great",
+    "bahut acha": "that's very good",
+    "bahut accha": "that's very good",
+    "bohot acha": "that's very good",
+    "bilkul bekar": "completely useless",
+    "kuch nahi hota": "nothing works",
+    "dimag kharab": "it's driving me crazy",
+    "dimag ka dahi": "my mind is messed up",
+    "paisa barbaad": "total waste of money",
+    "time waste": "waste of time",
+    "band bajao": "taught a lesson",
+    "dum hai": "it takes courage",
+    "jaan de di": "gave it my all",
+    "aag laga di": "absolutely killed it",
+    "kamaal kar diya": "that was incredible",
+    "dil jeet liya": "won my heart",
+    "full paisa wasool": "totally worth the money",
+    "hawa tight hai": "things are tough right now",
+}
+
+_hindi_idioms = {
+    # Hindi Devanagari idioms → English
+    "वाह क्या बात है": "wow that's amazing",
+    "क्या बात है": "that's amazing",
+    "वाह क्या बात": "wow that's amazing",
+    "मज़ा आ गया": "that was so enjoyable",
+    "दिल खुश हो गया": "it made me so happy",
+    "बहुत बढ़िया": "that's really great",
+    "बहुत अच्छा": "that's very good",
+    "बिल्कुल बेकार": "completely useless",
+    "दिमाग खराब": "it's driving me crazy",
+    "पैसा बर्बाद": "total waste of money",
+    "कमाल कर दिया": "that was incredible",
+    "दिल जीत लिया": "won my heart",
+}
+
+
 def translate_to_english(hindi_text, original_text):
     """
-    Translate to English using the Hindi text (after transliteration) for better accuracy.
-    Falls back to original text if Hindi translation fails.
+    General Hinglish/Hindi -> English translation.
+
+    Strategy:
+    0. Check idiom dictionary for known phrases
+    1. Translate normalized Hindi text first
+    2. Reject weak / overly short outputs
+    3. Fallback to original text auto-detect
+    4. Final fallback = original text
     """
+
+    def clean(txt):
+        return txt.strip() if txt else ""
+
+    # ---- Idiom pre-processing ----
+    roman_lower = re.sub(r"[^\w\s]", "", original_text.lower()).strip()
+    roman_lower = re.sub(r"\s+", " ", roman_lower)
+
+    # Check longest idiom matches first (greedy)
+    for phrase, eng in sorted(_hinglish_idioms.items(),
+                              key=lambda x: len(x[0]), reverse=True):
+        if phrase in roman_lower:
+            remaining = roman_lower.replace(phrase, "").strip()
+            parts = []
+            if remaining:
+                try:
+                    extra = GoogleTranslator(
+                        source="auto", target="en"
+                    ).translate(remaining)
+                    if extra and extra.strip():
+                        parts.append(extra.strip())
+                except Exception:
+                    parts.append(remaining)
+            parts.append(eng)
+            return " ".join(parts)
+
+    # Check Hindi idiom matches
+    for phrase, eng in sorted(_hindi_idioms.items(),
+                              key=lambda x: len(x[0]), reverse=True):
+        if phrase in hindi_text:
+            remaining = hindi_text.replace(phrase, "").strip()
+            parts = []
+            if remaining:
+                try:
+                    extra = GoogleTranslator(
+                        source="hi", target="en"
+                    ).translate(remaining)
+                    if extra and extra.strip():
+                        parts.append(extra.strip())
+                except Exception:
+                    parts.append(remaining)
+            parts.append(eng)
+            return " ".join(parts)
+
+    # ---- Standard translation ----
     try:
-        # First try translating the Hindi script text — this gives much better results
-        # because Google Translate handles proper Hindi better than Hinglish
-        result = GoogleTranslator(source="hi", target="en").translate(hindi_text)
-        if result and result.strip():
+        result = GoogleTranslator(
+            source="hi",
+            target="en"
+        ).translate(hindi_text)
+
+        result = clean(result)
+
+        # Accept only meaningful output
+        if result:
+
+            # If translator returned same Hindi text
+            if result.lower() == hindi_text.lower():
+                raise Exception()
+
+            # If input has multiple words but output too short
+            in_words = len(hindi_text.split())
+            out_words = len(result.split())
+
+            if in_words >= 3 and out_words <= 1:
+                raise Exception()
+
             return result
+
     except Exception:
         pass
 
     try:
-        # Fallback: translate original text with auto-detect
-        result = GoogleTranslator(source="auto", target="en").translate(original_text)
-        if result and result.strip():
+        result = GoogleTranslator(
+            source="auto",
+            target="en"
+        ).translate(original_text)
+
+        result = clean(result)
+
+        if result:
             return result
+
     except Exception:
         pass
 
@@ -60,6 +182,14 @@ st.write(
     "Analyze Hindi, English, and Hinglish text using an advanced NLP pipeline with "
     "tokenization, lemmatization, POS tagging, negation handling, sentiment analysis, "
     "and AI-powered emotion detection for more accurate contextual understanding."
+)
+
+st.markdown(
+    """
+🔗 **Project Repository:** [View Source Code, Contribute & See Sample Inputs](https://github.com/your-username/your-repo)
+
+🚀 Explore the repository for **setup instructions, documentation, contribution guide, and more sample test inputs**.
+"""
 )
 
 text = st.text_area("Enter Text", height=150,
@@ -144,7 +274,7 @@ if st.button("Analyze Sentiment"):
                 # ---- Step 7: Emotion (Hybrid AI + Complaint Detection) ----
                 try:
                     lower = text.lower()
-                
+
                     if any(word in lower for word in [
                         "hang", "slow", "crash", "lag",
                         "baar baar", "again and again",
@@ -152,18 +282,18 @@ if st.button("Analyze Sentiment"):
                     ]):
                         emotion = "Frustration"
                         escore = 0.92
-                
+
                     elif any(word in lower for word in [
                         "wow", "wah", "amazing", "mast", "awesome"
                     ]):
                         emotion = "Joy"
                         escore = 0.91
-                
+
                     else:
                         emo = emotion_model(en_text)[0][0]
                         emotion = emo["label"].title()
                         escore = round(emo["score"], 3)
-                
+
                 except Exception:
                     emotion = "Neutral"
                     escore = 0.0
