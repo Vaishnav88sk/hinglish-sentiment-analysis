@@ -1,0 +1,47 @@
+# Virtual Environment
+venv/
+.env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Streamlit
+.streamlit/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Build / Dist
+build/
+dist/
+*.egg-info/
+
+# Model / NLP Downloads
+stanza_resources/
+nltk_data/
+
+# Temporary files
+*.tmp
+*.swp
+
+# Large media / docs not needed in repo
+*.mp4
+*.pdf
+*.docx
+
+# Notebook exports / backups
+*Colaboratory*

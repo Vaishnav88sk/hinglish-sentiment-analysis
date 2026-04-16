@@ -1,0 +1,10 @@
+streamlit
+pandas
+stanza
+transformers
+torch
+deep-translator
+sentencepiece
+protobuf
+numpy
+scikit-learn
