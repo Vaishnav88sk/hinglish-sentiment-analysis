@@ -1,4 +1,4 @@
-# 🧠 Hinglish Sentiment Analyzer
+# 🧠 Hinglish Sentiment Analyzer - [Visit Live site](https://hinglish-sentiment-analysis.streamlit.app/)
 
 Analyze **Hindi**, **English**, and **Hinglish (Hindi + English mixed text)** using an advanced NLP pipeline with:
 
